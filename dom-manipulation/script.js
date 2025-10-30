@@ -15,26 +15,21 @@ document.addEventListener("DOMContentLoaded", () => {
   let quotes = loadQuotesFromLocalStorage();
 
   populateCategories();
-
-  // Restore last selected filter
-  const lastFilter = localStorage.getItem(FILTER_KEY) || "all";
-  if (Array.from(categoryFilter.options).some(opt => opt.value === lastFilter)) {
-    categoryFilter.value = lastFilter;
-  }
-
+  restoreLastFilter();
   showFilteredQuote();
 
   // Event listeners
   newQuoteBtn.addEventListener("click", showFilteredQuote);
   categoryFilter.addEventListener("change", filterQuotes);
 
+  // Periodic sync with server simulation
+  setInterval(syncWithServer, 30000); // every 30 seconds
+
   function loadQuotesFromLocalStorage() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return defaultQuotes.slice();
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) throw new Error("Invalid array");
-      return parsed;
+      const data = localStorage.getItem(STORAGE_KEY);
+      if (!data) return defaultQuotes.slice();
+      return JSON.parse(data);
     } catch {
       localStorage.removeItem(STORAGE_KEY);
       return defaultQuotes.slice();
@@ -48,7 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
   function populateCategories() {
     const categories = Array.from(new Set(quotes.map(q => q.category))).sort();
     categoryFilter.innerHTML = "";
-
     const allOption = document.createElement("option");
     allOption.value = "all";
     allOption.textContent = "All Categories";
@@ -60,6 +54,13 @@ document.addEventListener("DOMContentLoaded", () => {
       opt.textContent = cat;
       categoryFilter.appendChild(opt);
     });
+  }
+
+  function restoreLastFilter() {
+    const lastFilter = localStorage.getItem(FILTER_KEY) || "all";
+    if (Array.from(categoryFilter.options).some(opt => opt.value === lastFilter)) {
+      categoryFilter.value = lastFilter;
+    }
   }
 
   function filterQuotes() {
@@ -91,5 +92,37 @@ document.addEventListener("DOMContentLoaded", () => {
     populateCategories();
     categoryFilter.value = category;
     showFilteredQuote();
+  }
+
+  // --- Server Sync Simulation ---
+  function syncWithServer() {
+    fakeServerFetch().then(serverQuotes => {
+      let updated = 0;
+      serverQuotes.forEach(sq => {
+        const exists = quotes.some(lq => lq.text === sq.text && lq.category === sq.category);
+        if (!exists) {
+          quotes.push(sq); // server wins in conflict
+          updated++;
+        }
+      });
+
+      if (updated) {
+        saveQuotesToLocalStorage();
+        populateCategories();
+        alert(`${updated} new quote(s) synced from server.`);
+      }
+    });
+  }
+
+  function fakeServerFetch() {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const serverQuotes = [
+          { text: "Server says: Stay positive!", category: "Motivation" },
+          { text: "Server wisdom: Keep learning.", category: "Learning" }
+        ];
+        resolve(serverQuotes);
+      }, 1000);
+    });
   }
 });
