@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Quote Generator</title>
+  <link rel="stylesheet" href="/dom-manipulation/styles.css">
+</head>
+<body>
+  <h1>Dynamic Quote Generator</h1>
+  <label for="categorySelect">Choose a category:</label>
+  <select id="categorySelect"></select>
+  <div id="quoteDisplay" style="margin: 20px 0; font-size: 1.2em; font-style: italic;"></div>
+  <button id="newQuote">Show New Quote</button>
+
+  <h3>Add a New Quote</h3>
+  <div>
+    <input id="newQuoteText" type="text" placeholder="Enter a new quote" />
+    <input id="newQuoteCategory" type="text" placeholder="Enter quote category" />
+    <button id="addQuoteButton">Add Quote</button>
+  </div>
+
+  <script src="/dom-manipulation/scripts.js"></script>
+</body>
+</html>
