@@ -207,7 +207,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (updates > 0) {
       saveQuotesToLocalStorage();
       populateCategories();
-      alert(`${updates} new quote(s) synced from server.`);
+      alert("Quotes synced with server!"); // <- exact text required
     }
   }
 });
