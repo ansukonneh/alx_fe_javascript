@@ -10,24 +10,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const quoteDisplay = document.getElementById("quoteDisplay");
   const newQuoteBtn = document.getElementById("newQuote");
+  const categoryFilter = document.getElementById("categoryFilter");
+  const addQuoteButton = document.getElementById("addQuoteButton");
+  const newQuoteText = document.getElementById("newQuoteText");
+  const newQuoteCategory = document.getElementById("newQuoteCategory");
+  const exportBtn = document.getElementById("exportBtn");
+  const importFile = document.getElementById("importFile");
 
   let quotes = loadQuotesFromLocalStorage();
 
-  const categoryLabel = document.createElement("label");
-  categoryLabel.textContent = "Filter by Category: ";
-  const categoryFilter = document.createElement("select");
-  categoryFilter.id = "categoryFilter";
-  categoryFilter.style.marginRight = "10px";
-  categoryFilter.addEventListener("change", filterQuotes);
-
-  document.body.insertBefore(categoryLabel, quoteDisplay);
-  document.body.insertBefore(categoryFilter, quoteDisplay);
-
-  createAddQuoteForm();
   populateCategories();
 
-  newQuoteBtn.addEventListener("click", showFilteredQuote);
-
+  // Restore last selected filter
   const lastFilter = localStorage.getItem(FILTER_KEY) || "all";
   if (Array.from(categoryFilter.options).some(opt => opt.value === lastFilter)) {
     categoryFilter.value = lastFilter;
@@ -35,7 +29,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showFilteredQuote();
 
-  setInterval(syncWithServer, 30000); // sync every 30 seconds
+  // Event listeners
+  newQuoteBtn.addEventListener("click", showFilteredQuote);
+  categoryFilter.addEventListener("change", filterQuotes);
+  addQuoteButton.addEventListener("click", addQuote);
+  exportBtn.addEventListener("click", exportQuotesToJson);
+  importFile.addEventListener("change", importFromJsonFile);
+
+  // Periodic server sync simulation
+  setInterval(syncWithServer, 30000);
 
   function loadQuotesFromLocalStorage() {
     try {
@@ -87,52 +89,74 @@ document.addEventListener("DOMContentLoaded", () => {
     try { sessionStorage.setItem("dqg.lastQuote", JSON.stringify(chosen)); } catch {}
   }
 
-  function createAddQuoteForm() {
-    const formContainer = document.createElement("div");
-    formContainer.style.marginTop = "16px";
+  function addQuote() {
+    const text = newQuoteText.value.trim();
+    const category = newQuoteCategory.value.trim();
+    if (!text || !category) {
+      alert("Please fill in both fields.");
+      return;
+    }
+    quotes.push({ text, category });
+    saveQuotesToLocalStorage();
+    populateCategories();
+    categoryFilter.value = category;
+    showFilteredQuote();
+    newQuoteText.value = "";
+    newQuoteCategory.value = "";
+    alert("Quote added successfully!");
+  }
 
-    const title = document.createElement("h3");
-    title.textContent = "Add a New Quote";
+  function exportQuotesToJson() {
+    try {
+      const blob = new Blob([JSON.stringify(quotes, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+      a.download = `quotes-export-${timestamp}.json`;
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert("Export failed: " + err.message);
+    }
+  }
 
-    const inputQuote = document.createElement("input");
-    inputQuote.type = "text";
-    inputQuote.placeholder = "Enter a new quote";
-    inputQuote.style.marginRight = "8px";
-
-    const inputCategory = document.createElement("input");
-    inputCategory.type = "text";
-    inputCategory.placeholder = "Enter quote category";
-    inputCategory.style.marginRight = "8px";
-
-    const addBtn = document.createElement("button");
-    addBtn.textContent = "Add Quote";
-
-    addBtn.addEventListener("click", () => {
-      const text = inputQuote.value.trim();
-      const category = inputCategory.value.trim();
-      if (!text || !category) {
-        alert("Please fill in both fields.");
-        return;
+  function importFromJsonFile(event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (!Array.isArray(parsed)) throw new Error("Imported JSON must be an array of quotes.");
+        let added = 0;
+        for (const q of parsed) {
+          if (typeof q.text !== "string" || typeof q.category !== "string") throw new Error("Invalid quote format");
+          const exists = quotes.some(existing => existing.text === q.text && existing.category === q.category);
+          if (!exists) {
+            quotes.push({ text: q.text, category: q.category });
+            added++;
+          }
+        }
+        if (added > 0) {
+          saveQuotesToLocalStorage();
+          populateCategories();
+          alert(`Imported ${added} new quote(s) successfully.`);
+        } else {
+          alert("No new quotes to import (duplicates ignored).");
+        }
+      } catch (err) {
+        alert("Failed to import JSON: " + err.message);
+      } finally {
+        event.target.value = "";
       }
-      quotes.push({ text, category });
-      saveQuotesToLocalStorage();
-      populateCategories();
-      categoryFilter.value = category;
-      showFilteredQuote();
-      inputQuote.value = "";
-      inputCategory.value = "";
-      alert("Quote added successfully!");
-    });
-
-    formContainer.appendChild(title);
-    formContainer.appendChild(inputQuote);
-    formContainer.appendChild(inputCategory);
-    formContainer.appendChild(addBtn);
-    newQuoteBtn.parentNode.insertBefore(formContainer, newQuoteBtn.nextSibling);
+    };
+    reader.readAsText(file);
   }
 
   function syncWithServer() {
-    // Simulate fetching server quotes
     fakeServerFetch().then(serverQuotes => {
       let conflictsResolved = 0;
       serverQuotes.forEach(sq => {
