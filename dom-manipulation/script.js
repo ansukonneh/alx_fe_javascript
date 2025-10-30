@@ -30,10 +30,10 @@ document.addEventListener("DOMContentLoaded", () => {
   exportBtn.addEventListener("click", exportQuotesToJson);
   importFile.addEventListener("change", importFromJsonFile);
 
-  // Periodic server sync simulation
-  setInterval(syncWithServer, 30000); // every 30 seconds
+  // Periodic server sync every 30 seconds
+  setInterval(syncQuotes, 30000);
 
-  // --- Core Functions ---
+  // -------------------- Core Functions --------------------
   function loadQuotesFromLocalStorage() {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
@@ -100,13 +100,18 @@ document.addEventListener("DOMContentLoaded", () => {
       alert("Please fill in both fields.");
       return;
     }
-    quotes.push({ text, category });
+    const newQuote = { text, category };
+    quotes.push(newQuote);
     saveQuotesToLocalStorage();
     populateCategories();
     categoryFilter.value = category;
     showFilteredQuote();
     newQuoteText.value = "";
     newQuoteCategory.value = "";
+
+    // Post to server
+    postQuoteToServer(newQuote);
+
     alert("Quote added successfully!");
   }
 
@@ -160,34 +165,49 @@ document.addEventListener("DOMContentLoaded", () => {
     reader.readAsText(file);
   }
 
-  // --- Server Sync Simulation ---
-  function syncWithServer() {
-    fetchQuotesFromServer().then(serverQuotes => {
-      let updated = 0;
-      serverQuotes.forEach(sq => {
-        const exists = quotes.some(lq => lq.text === sq.text && lq.category === sq.category);
-        if (!exists) {
-          quotes.push(sq); // server wins
-          updated++;
-        }
-      });
-      if (updated) {
-        saveQuotesToLocalStorage();
-        populateCategories();
-        alert(`${updated} new quote(s) synced from server.`);
-      }
-    });
+  // -------------------- Server Sync Functions --------------------
+  async function fetchQuotesFromServer() {
+    try {
+      const response = await fetch("https://jsonplaceholder.typicode.com/posts");
+      const data = await response.json();
+      return data.slice(0, 5).map(item => ({
+        text: item.title,
+        category: "Server"
+      }));
+    } catch (err) {
+      console.error("Failed to fetch from server:", err);
+      return [];
+    }
   }
 
-  function fetchQuotesFromServer() {
-    return new Promise(resolve => {
-      setTimeout(() => {
-        const serverQuotes = [
-          { text: "Server says: Stay positive!", category: "Motivation" },
-          { text: "Server wisdom: Keep learning.", category: "Learning" }
-        ];
-        resolve(serverQuotes);
-      }, 1000);
+  async function postQuoteToServer(quote) {
+    try {
+      await fetch("https://jsonplaceholder.typicode.com/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quote)
+      });
+    } catch (err) {
+      console.error("Failed to post quote to server:", err);
+    }
+  }
+
+  async function syncQuotes() {
+    const serverQuotes = await fetchQuotesFromServer();
+    let updates = 0;
+
+    serverQuotes.forEach(sq => {
+      const exists = quotes.some(lq => lq.text === sq.text && lq.category === sq.category);
+      if (!exists) {
+        quotes.push(sq);
+        updates++;
+      }
     });
+
+    if (updates > 0) {
+      saveQuotesToLocalStorage();
+      populateCategories();
+      alert(`${updates} new quote(s) synced from server.`);
+    }
   }
 });
